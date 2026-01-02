@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Step-by-Step Composer</title>
+    <style>
+      :root {
+        font-family: "Inter", "Noto Sans JP", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        color-scheme: light dark;
+        --bg: #0f1729;
+        --panel: #182238;
+        --panel-light: #ffffff;
+        --border: rgba(255, 255, 255, 0.15);
+        --text: #f5f7ff;
+        --muted: #9da9c6;
+        --accent: #ff8c64;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        background: radial-gradient(circle at top, rgba(255, 140, 100, 0.18), transparent 65%) no-repeat,
+          var(--bg);
+        color: var(--text);
+        padding: clamp(1rem, 3vw, 2rem);
+        display: flex;
+        justify-content: center;
+      }
+
+      main {
+        width: min(960px, 100%);
+        display: flex;
+        flex-direction: column;
+        gap: 1.5rem;
+      }
+
+      header h1 {
+        margin: 0;
+        font-size: clamp(1.8rem, 4vw, 2.6rem);
+      }
+
+      header p {
+        margin: 0.4rem 0 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      section {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: clamp(1rem, 2.5vw, 1.6rem);
+        box-shadow: 0 18px 30px rgba(5, 6, 10, 0.4);
+      }
+
+      section h2 {
+        margin: 0 0 0.8rem;
+        font-size: 1.1rem;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      label {
+        display: block;
+        margin-bottom: 0.5rem;
+      }
+
+      select,
+      button,
+      textarea {
+        font: inherit;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        padding: 0.6rem 0.8rem;
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+      }
+
+      select {
+        width: 100%;
+      }
+
+      button {
+        cursor: pointer;
+        border-radius: 999px;
+        border: none;
+        padding: 0.65rem 1.4rem;
+        background: linear-gradient(120deg, var(--accent), #ff5d7a);
+        color: #fff;
+        font-weight: 600;
+        transition: transform 120ms ease, opacity 120ms ease;
+      }
+
+      button.secondary {
+        background: rgba(255, 255, 255, 0.08);
+        color: var(--text);
+      }
+
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      button:not(:disabled):hover {
+        transform: translateY(-1px);
+      }
+
+      .controls {
+        display: flex;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+        margin-top: 0.8rem;
+      }
+
+      #candidate-card {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 0.6rem;
+        align-items: center;
+        font-size: 1rem;
+      }
+
+      #candidate-note {
+        font-size: 2rem;
+        font-weight: 700;
+      }
+
+      #sequence-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 0.6rem;
+      }
+
+      .sequence-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.8rem;
+        padding: 0.7rem 1rem;
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.07);
+      }
+
+      .sequence-meta {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .note-name {
+        font-size: 1.1rem;
+        font-weight: 600;
+      }
+
+      .note-source {
+        font-size: 0.85rem;
+        color: var(--muted);
+      }
+
+      .status {
+        font-size: 0.9rem;
+        color: #ffd7ae;
+        margin-top: 0.4rem;
+      }
+
+      .hidden {
+        display: none;
+      }
+
+      .length-control {
+        margin-top: 1rem;
+        padding: 0.9rem;
+        border-radius: 12px;
+        border: 1px dashed var(--border);
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      @media (max-width: 640px) {
+        button,
+        select {
+          width: 100%;
+        }
+        #candidate-card {
+          grid-template-columns: 1fr;
+          text-align: center;
+        }
+        .sequence-item {
+          flex-direction: column;
+          align-items: flex-start;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header>
+        <h1>Step-by-Step Composer</h1>
+        <p>開始ノートを選ぶと、音楽的に自然な次の音を提案し、その場で試聴できます。</p>
+      </header>
+
+      <section>
+        <h2>1. 開始ノート</h2>
+        <label for="note-select">Cメジャースケール (オクターブ 3〜6)</label>
+        <select id="note-select">
+          <option value="">-- 選択してください --</option>
+          <option value="C3">C3</option>
+          <option value="D3">D3</option>
+          <option value="E3">E3</option>
+          <option value="F3">F3</option>
+          <option value="G3">G3</option>
+          <option value="A3">A3</option>
+          <option value="B3">B3</option>
+          <option value="C4">C4</option>
+          <option value="D4">D4</option>
+          <option value="E4">E4</option>
+          <option value="F4">F4</option>
+          <option value="G4">G4</option>
+          <option value="A4">A4</option>
+          <option value="B4">B4</option>
+          <option value="C5">C5</option>
+          <option value="D5">D5</option>
+          <option value="E5">E5</option>
+          <option value="F5">F5</option>
+          <option value="G5">G5</option>
+          <option value="A5">A5</option>
+          <option value="B5">B5</option>
+          <option value="C6">C6</option>
+        </select>
+        <div class="controls">
+          <button id="set-first">この音で始める</button>
+          <button id="play-selected" class="secondary">選択した音を試聴</button>
+        </div>
+        <div id="duration-wrap" class="length-control hidden">
+          <div class="status" id="duration-target">調整対象: --</div>
+          <label for="duration-select">音の長さ</label>
+          <select id="duration-select"></select>
+          <div class="status" id="duration-status"></div>
+        </div>
+        <div class="status" id="first-note-status"></div>
+      </section>
+
+      <section>
+        <h2>2. 自動候補</h2>
+        <div id="candidate-card">
+          <div id="candidate-note">--</div>
+          <div id="candidate-info">開始ノートを設定すると候補が表示されます。</div>
+        </div>
+        <div class="controls">
+          <button id="play-candidate" class="secondary" disabled>候補を再生</button>
+          <button id="accept-candidate" disabled>この音を追加</button>
+          <button id="skip-candidate" class="secondary" disabled>別の候補を表示</button>
+        </div>
+      </section>
+
+      <section>
+        <h2>3. 現在の並び</h2>
+        <ul id="sequence-list">
+          <li class="sequence-item">
+            <div class="sequence-meta">
+              <span class="note-name">--</span>
+              <span class="note-source">まだ音がありません</span>
+            </div>
+          </li>
+        </ul>
+        <div class="controls">
+          <button id="play-sequence" class="secondary" disabled>すべて再生</button>
+          <button id="undo-note" class="secondary" disabled>最後の音を削除</button>
+        </div>
+      </section>
+
+    </main>
+
+    <script>
+      const LETTER_TO_SEMITONE = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+      const SCALE = ["C", "D", "E", "F", "G", "A", "B"];
+      const OCTAVES = [3, 4, 5];
+      const CANDIDATE_STEPS = [2, -1, 3, 1, -2, 4, -3, 5];
+      const STEP_DESCRIPTION = {
+        "2": "上行の経過音 (+2度)",
+        "-1": "下行の経過音 (-1度)",
+        "3": "長三度の跳躍 (+3度)",
+        "1": "隣接音 (+1度)",
+        "-2": "下降三度 (-2度)",
+        "4": "完全五度 (+4度)",
+        "-3": "短六度 (-3度)",
+        "5": "長六度 (+5度)",
+      };
+      const DURATION_OPTIONS = [
+        { key: "short", label: "短め (♪8)", seconds: 0.35 },
+        { key: "medium", label: "標準 (♪4)", seconds: 0.6 },
+        { key: "long", label: "伸ばし気味 (♪2)", seconds: 1.0 },
+        { key: "hold", label: "ホールド (全音)", seconds: 1.4 },
+      ];
+      const DEFAULT_DURATION_KEY = "medium";
+
+      function createNote(name) {
+        const match = name.match(/^([A-Ga-g])(#+|b+)?(\d)$/);
+        if (!match) throw new Error(`Invalid note: ${name}`);
+        const letter = match[1].toUpperCase();
+        const accidental = match[2] || "";
+        const octave = Number(match[3]);
+        let semitone = LETTER_TO_SEMITONE[letter];
+        if (accidental.includes("#")) semitone += accidental.length;
+        if (accidental.includes("b")) semitone -= accidental.length;
+        const midi = 12 * (octave + 1) + semitone;
+        const frequency = 440 * Math.pow(2, (midi - 69) / 12);
+        return { name: `${letter}${accidental}${octave}`, midi, frequency };
+      }
+
+      const NOTE_POOL = (() => {
+        const pool = [];
+        OCTAVES.forEach((oct) => {
+          SCALE.forEach((note) => {
+            pool.push(createNote(`${note}${oct}`));
+          });
+        });
+        pool.push(createNote("C6"));
+        return pool;
+      })();
+
+      const NOTE_INDEX = Object.fromEntries(NOTE_POOL.map((note, idx) => [note.name, idx]));
+
+      const noteSelect = document.getElementById("note-select");
+      const firstNoteStatus = document.getElementById("first-note-status");
+      const candidateNoteEl = document.getElementById("candidate-note");
+      const candidateInfoEl = document.getElementById("candidate-info");
+      const sequenceList = document.getElementById("sequence-list");
+      const playSelectedBtn = document.getElementById("play-selected");
+      const setFirstBtn = document.getElementById("set-first");
+      const playCandidateBtn = document.getElementById("play-candidate");
+      const acceptCandidateBtn = document.getElementById("accept-candidate");
+      const skipCandidateBtn = document.getElementById("skip-candidate");
+      const playSequenceBtn = document.getElementById("play-sequence");
+      const undoBtn = document.getElementById("undo-note");
+      const durationWrap = document.getElementById("duration-wrap");
+      const durationTarget = document.getElementById("duration-target");
+      const durationSelect = document.getElementById("duration-select");
+      const durationStatus = document.getElementById("duration-status");
+
+      const composition = [];
+      let candidate = null;
+      let candidateCursor = 0;
+      let audioCtx;
+
+      function populateSelect() {
+        const existingValues = new Set(Array.from(noteSelect.options).map((opt) => opt.value));
+        if (!existingValues.has("")) {
+          const placeholder = document.createElement("option");
+          placeholder.value = "";
+          placeholder.textContent = "-- 選択してください --";
+          noteSelect.insertBefore(placeholder, noteSelect.firstChild);
+        }
+        NOTE_POOL.forEach((note) => {
+          if (!existingValues.has(note.name)) {
+            const option = document.createElement("option");
+            option.value = note.name;
+            option.textContent = note.name;
+            noteSelect.appendChild(option);
+          }
+        });
+      }
+
+      async function ensureAudioContext() {
+        const AudioClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioClass) {
+          firstNoteStatus.textContent = "ブラウザがWeb Audio APIに対応していません。";
+          return null;
+        }
+        if (!audioCtx) {
+          audioCtx = new AudioClass();
+        }
+        if (audioCtx.state === "suspended") {
+          try {
+            await audioCtx.resume();
+          } catch (error) {
+            console.warn("AudioContext resume failed", error);
+            return null;
+          }
+        }
+        return audioCtx;
+      }
+      let audioPrimed = false;
+      function primeAudioContext() {
+        if (audioPrimed) return;
+        audioPrimed = true;
+        ensureAudioContext();
+      }
+      window.addEventListener("pointerdown", primeAudioContext, { once: true });
+      window.addEventListener("keydown", primeAudioContext, { once: true });
+
+      function durationToSeconds(key) {
+        const entry = DURATION_OPTIONS.find((option) => option.key === key);
+        return entry ? entry.seconds : DURATION_OPTIONS[1].seconds;
+      }
+
+      function formatDurationLabel(key) {
+        const entry = DURATION_OPTIONS.find((option) => option.key === key);
+        return entry ? entry.label : "標準 (♪4)";
+      }
+
+      function scheduleNote(ctx, note, duration, delay = 0) {
+        const start = ctx.currentTime + delay;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.value = note.frequency;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        const attack = Math.min(0.04, duration * 0.15);
+        const sustainStart = start + attack;
+        const sustainEnd = start + duration * 0.8;
+        const releaseEnd = start + duration + 0.12;
+
+        gain.gain.cancelScheduledValues(start);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.9, sustainStart);
+        gain.gain.linearRampToValueAtTime(0.25, sustainEnd);
+        gain.gain.exponentialRampToValueAtTime(0.0001, releaseEnd);
+
+        osc.start(start);
+        osc.stop(releaseEnd);
+        osc.addEventListener("ended", () => {
+          osc.disconnect();
+          gain.disconnect();
+        });
+      }
+
+      async function playNote(name, durationKey = DEFAULT_DURATION_KEY, delay = 0) {
+        const note = NOTE_POOL[NOTE_INDEX[name]];
+        if (!note) return;
+        const ctx = await ensureAudioContext();
+        if (!ctx) return;
+        const duration = durationToSeconds(durationKey);
+        scheduleNote(ctx, note, duration, delay);
+      }
+
+      function pickCandidate(anchor, offset = 0) {
+        const baseIndex = NOTE_INDEX[anchor];
+        const total = CANDIDATE_STEPS.length;
+        for (let i = 0; i < total; i += 1) {
+          const step = CANDIDATE_STEPS[(candidateCursor + offset + i) % total];
+          const target = baseIndex + step;
+          if (NOTE_POOL[target]) {
+            candidateCursor = (candidateCursor + offset + i) % total;
+            return { ...NOTE_POOL[target], step };
+          }
+        }
+        return null;
+      }
+
+      function updateCandidateView() {
+        if (!candidate) {
+          candidateNoteEl.textContent = "--";
+          candidateInfoEl.textContent = composition.length
+            ? "候補が見つかりません。オクターブ範囲を変えてください。"
+            : "開始ノートを設定してください。";
+          playCandidateBtn.disabled = true;
+          acceptCandidateBtn.disabled = true;
+          skipCandidateBtn.disabled = composition.length === 0;
+          return;
+        }
+        candidateNoteEl.textContent = candidate.name;
+        candidateInfoEl.textContent = STEP_DESCRIPTION[candidate.step] || "自動提案";
+        playCandidateBtn.disabled = false;
+        acceptCandidateBtn.disabled = false;
+        skipCandidateBtn.disabled = false;
+      }
+
+      function renderSequence() {
+        sequenceList.innerHTML = "";
+        if (!composition.length) {
+          const empty = document.createElement("li");
+          empty.className = "sequence-item";
+          empty.innerHTML = `
+            <div class="sequence-meta">
+              <span class="note-name">--</span>
+              <span class="note-source">まだ音がありません</span>
+            </div>`;
+          sequenceList.appendChild(empty);
+          playSequenceBtn.disabled = true;
+          undoBtn.disabled = true;
+          return;
+        }
+
+        composition.forEach((entry) => {
+          const li = document.createElement("li");
+          li.className = "sequence-item";
+          const detail =
+            entry.source === "user" ? "入力した音" : STEP_DESCRIPTION[entry.step] || "自動提案";
+          li.innerHTML = `
+            <div class="sequence-meta">
+              <span class="note-name">${entry.name}</span>
+              <span class="note-source">${detail} / ${formatDurationLabel(
+                entry.durationKey || DEFAULT_DURATION_KEY
+              )}</span>
+            </div>
+          `;
+          const playBtn = document.createElement("button");
+          playBtn.type = "button";
+          playBtn.className = "secondary";
+          playBtn.textContent = "🎧 再生";
+          playBtn.addEventListener("click", async () => {
+            await playNote(entry.name, entry.durationKey);
+          });
+          li.appendChild(playBtn);
+          sequenceList.appendChild(li);
+        });
+
+        playSequenceBtn.disabled = false;
+        undoBtn.disabled = false;
+      }
+
+      function updateDurationPanel() {
+        if (!composition.length) {
+          durationWrap.classList.add("hidden");
+          durationTarget.textContent = "調整対象: --";
+          durationStatus.textContent = "";
+          return;
+        }
+        const latest = composition[composition.length - 1];
+        durationWrap.classList.remove("hidden");
+        durationTarget.textContent = `調整対象: ${latest.name}`;
+        durationSelect.value = latest.durationKey || DEFAULT_DURATION_KEY;
+        durationStatus.textContent = `現在: ${formatDurationLabel(
+          latest.durationKey || DEFAULT_DURATION_KEY
+        )}`;
+      }
+
+      function populateDurationSelect() {
+        durationSelect.innerHTML = "";
+        DURATION_OPTIONS.forEach((option) => {
+          const opt = document.createElement("option");
+          opt.value = option.key;
+          opt.textContent = option.label;
+          durationSelect.appendChild(opt);
+        });
+        durationSelect.value = DEFAULT_DURATION_KEY;
+      }
+
+      function setStartNoteUI(name) {
+        if (!name) return;
+        noteSelect.value = name;
+        firstNoteStatus.textContent = `${name} を開始ノートとして扱っています。`;
+      }
+
+      function resetComposition(root) {
+        composition.length = 0;
+        candidate = null;
+        candidateCursor = 0;
+        if (!root) {
+          renderSequence();
+          updateCandidateView();
+          updateDurationPanel();
+          return;
+        }
+        composition.push({
+          ...NOTE_POOL[NOTE_INDEX[root]],
+          source: "user",
+          durationKey: DEFAULT_DURATION_KEY,
+        });
+        candidate = pickCandidate(root);
+        renderSequence();
+        updateCandidateView();
+        updateDurationPanel();
+      }
+
+      setFirstBtn.addEventListener("click", async () => {
+        const selected = noteSelect.value;
+        if (!selected) {
+          firstNoteStatus.textContent = "音を選んでください。";
+          return;
+        }
+        firstNoteStatus.textContent = `${selected} を開始ノートに設定しました。`;
+        resetComposition(selected);
+        setStartNoteUI(selected);
+        await playNote(selected, DEFAULT_DURATION_KEY);
+      });
+
+      playSelectedBtn.addEventListener("click", async () => {
+        const selected = noteSelect.value;
+        if (!selected) {
+          firstNoteStatus.textContent = "音を選んでください。";
+          return;
+        }
+        firstNoteStatus.textContent = `${selected} を試聴しました。`;
+        await playNote(selected, DEFAULT_DURATION_KEY);
+      });
+
+      playCandidateBtn.addEventListener("click", async () => {
+        if (!candidate) return;
+        await playNote(candidate.name, DEFAULT_DURATION_KEY);
+      });
+
+      acceptCandidateBtn.addEventListener("click", () => {
+        if (!candidate) return;
+        const acceptedName = candidate.name;
+        composition.push({
+          ...candidate,
+          source: "auto",
+          step: candidate.step,
+          durationKey: DEFAULT_DURATION_KEY,
+        });
+        setStartNoteUI(acceptedName);
+        candidateCursor = 0;
+        candidate = pickCandidate(acceptedName);
+        renderSequence();
+        updateCandidateView();
+        updateDurationPanel();
+      });
+
+      skipCandidateBtn.addEventListener("click", () => {
+        if (!composition.length) return;
+        candidate = pickCandidate(composition[composition.length - 1].name, 1);
+        updateCandidateView();
+      });
+
+      undoBtn.addEventListener("click", () => {
+        if (!composition.length) return;
+        composition.pop();
+        if (!composition.length) {
+          candidate = null;
+          noteSelect.value = "";
+          firstNoteStatus.textContent = "音を選んでください。";
+        } else {
+          candidateCursor = 0;
+          candidate = pickCandidate(composition[composition.length - 1].name);
+          setStartNoteUI(composition[composition.length - 1].name);
+        }
+        renderSequence();
+        updateCandidateView();
+        updateDurationPanel();
+      });
+
+      playSequenceBtn.addEventListener("click", async () => {
+        if (!composition.length) return;
+        const ctx = await ensureAudioContext();
+        if (!ctx) return;
+        composition.forEach((entry, idx) => {
+          const note = NOTE_POOL[NOTE_INDEX[entry.name]];
+          if (!note) return;
+          const duration = durationToSeconds(entry.durationKey);
+          scheduleNote(ctx, note, duration, idx * 0.7);
+        });
+      });
+
+      populateSelect();
+      populateDurationSelect();
+      renderSequence();
+      updateCandidateView();
+      updateDurationPanel();
+
+      durationSelect.addEventListener("change", () => {
+        if (!composition.length) return;
+        const latest = composition[composition.length - 1];
+        latest.durationKey = durationSelect.value;
+        durationStatus.textContent = `現在: ${formatDurationLabel(latest.durationKey)}`;
+        renderSequence();
+      });
+    </script>
+  </body>
+</html>
